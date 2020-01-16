@@ -70,15 +70,14 @@ int find_result(Result* result_table, char* result_name, int num_to_iter) {
 	     int needed_result_index = -1;
 	     printf("mmmmm: %s\n", result_name);
 	     printf("line 124 client_context.c: %i \n", num_to_iter);
-        //printf("%i\n", result_lookup[0]->num_tuples);
-	     //printf("num to iter: %i \n", nu)
+  
         for (int i = 0; i != num_to_iter; ++i) {
-           // printf("help5\n");
+      
 
             char* comp_name = result_table[i].nm;
-           // printf("nnnnnn : %s\n",result_table[i].nm);
+ 
             if (strcmp(comp_name, result_name) == 0) {
-              //  printf("help4\n");
+ 
                 needed_result_index = i;
                 return i;
                 break;
