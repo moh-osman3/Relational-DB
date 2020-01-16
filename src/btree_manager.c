@@ -10,7 +10,7 @@
 #include "hash_table.h"
 
 
-
+// creates (val, id) tuple
 void create_tuple(ClusterTuple* cmp, int* data, int num_elts) {
 	for (int i = 0; i != num_elts; i++) {
 		cmp[i].val = data[i];
@@ -29,6 +29,7 @@ int max(int* data, int num_vals) {
 
 }
 
+// binary search that takes in clusterTuple
 int binary_search2(ClusterTuple* search_array, int target, int len) {
 	int start = 0; 
     int result = -1; 
@@ -58,6 +59,8 @@ int binary_search2(ClusterTuple* search_array, int target, int len) {
     return result; 
 }
 
+
+// binary search for btree search
 int binary_search(int* search_array, int target, int len) { 
     int start = 0; 
     int result = -1; 
@@ -86,6 +89,8 @@ int binary_search(int* search_array, int target, int len) {
     return result; 
 } 
 
+
+// comparator for unclustered index qsort
 int comparator_uncl(const void *p, const void *q) {
 	int val1 = *(const int*) p;
 	int val2 = *(const int*) q;
