@@ -62,9 +62,7 @@ char* get_table_name(char* token) {
   //  printf("line 59 client.c: %s\n", token);
     char** create_arguments_index = &token;
     char* tmp = strsep(create_arguments_index, ",");
-    if (!tmp) {
-        printf("dang\n");
-    }
+    
 
     //printf("line 62 client.c: \n");
     //printf("line 63 string: %s\n", );

@@ -7,7 +7,7 @@
 #include "utils.h"
 #include "parse.h"
 #include <limits.h>
-#include "project0/hash_table.h"
+#include "hash_table.h"
 
 
 

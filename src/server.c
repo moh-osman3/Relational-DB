@@ -82,15 +82,15 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
     //     global_result_count++;
     // }
 
-    printf("yuh17\n");
+
     if(!query)
     {
         return "165";
     } else {
-        printf("ABOUT TO INCREMENT!!!!");
+
         glob_mes_to_receive++;
     }
-    printf("yuh18\n");
+
     if(query && query->type == CREATE){
         CreateOperator operator = query->operator_fields.create_operator;
         if(operator.create_type == _DB){
@@ -107,28 +107,26 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
 
         }
         else if(operator.create_type == _TABLE){
-            printf("yuh10\n");
+            
             Status create_status;
             create_table(operator.db, 
                 operator.name, 
                 operator.col_count, 
                 &create_status);
-            printf("yuh11\n");
+        
             if (create_status.code != OK) {
                 return create_status.error_message;
             }
             return "Table successfully added";
         } else if (query->operator_fields.create_operator.create_type == _COLUMN) {
-            printf("yuh27\n");
-            printf("tb_name_server: %zu \n", operator.table->counter);
+            
             Status ret = create_column(operator.name, operator.table);
             if (ret.code != OK) {
                 return ret.error_message;
             }
 
 
-            printf("tb_name_server: %zu \n", operator.table->counter);
-            printf("name in server: %s\n", operator.table->columns[0].name);
+           
             return "Column successfully added";
     }
     } else if (query && query->type == INSERT) {
@@ -148,9 +146,7 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
 
         return "Insertion Successful";
     } else if (query && query->type == SELECT) {
-        printf("Line 123 server.c initi value of chandlesinuse: %i\n", query->context->chandles_in_use);
-        printf("yuh20\n");
-        printf("SERVER SELECT CURRENT DB: %zu\n", current_db->tables[0].table_length);
+        
         SelectOperator operator = query->operator_fields.select_operator;
         current_db->off = true;
         // if (operator.column) {
@@ -191,25 +187,10 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
             }
        }
        
-        printf("yuh22\n");
-         //= result;
-        //printf("hahaha: %s\n", result->nm);
-        //char* haha = (char*) (result->nm);
-        //char empty_str[strlen(result->nm)];
-        //strcpy(empty_str, result->nm);
-        //printf("This was the empty: %s\n", empty_str);
-        //query->context->chandle_table[global_result_counter]->nm = empty_str;
+
+       
 
 
-        // strcpy(result_lookup[global_result_counter]->nm, result->nm);
-        //query->context->chandle_table[global_result_counter]->payload = result->payload;
-      //query->context->chandle_table[global_result_counter]->num_tuples = result->num_tuples;
-        //query->context->chandle_table[global_result_counter]->data_type = INT;
-        //printf("name in result: %s\n", result->nm);
-        
-        // if (strcmp(res->nm, "a_plus") == 0) {
-        //     return "select successful";
-        // }
         query->context->chandles_in_use++;
         printf("its not possible: %s\n", query->context->chandle_table[0].nm);
         return "select successful";        
@@ -305,14 +286,14 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
                     }
                     
                     if (send(client_sock, &(send_message), sizeof(message), 0) == -1) {
-                        return "wtf";
+                        return "error";
                     }
            
                    // printf("yuh99: %lu\n", sizeof(send_buffer));
 
                 
                     if (send(client_sock, send_message.payload2,send_message.length, 0) == -1) {
-                        return "wtf2";
+                        return "error";
                     }
                     
                 } else if (result[res].data_type == LONG ) {
@@ -325,32 +306,32 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
                     }
                    //send_message.length *=2;
                     if (send(client_sock, &(send_message), sizeof(message), 0) == -1) {
-                        return "wtf";
+                        return "error";
                     }
            
-                    printf("yuh99: %lu\n", sizeof(send_buffer));
+                   
 
                 
                     if (send(client_sock, send_message.payload4, send_message.length, 0) == -1) {
-                        return "wtf2";
+                        return "error";
                     }
                 } else { 
                     send_message.payload3 = result[res].payload_float;
-                    printf("The avg: %f", result[res].payload_float[0]);
+                    
                     if (i == (operator.num_to_print - 1)) {
                         send_message.status = OK_NEWLINE;
                     } else {
                         send_message.status = OK_FLOAT;
                     }
                     if (send(client_sock, &(send_message), sizeof(message), 0) == -1) {
-                        return "wtf";
+                        return "error";
                     }
            
-                    printf("yuh99: %lu\n", sizeof(send_buffer));
+                  
 
                 
                     if (send(client_sock, send_message.payload3, send_message.length, 0) == -1) {
-                        return "wtf2";
+                        return "error";
                     }
                 }
                 results_payload += (send_message.length/4);
@@ -359,7 +340,6 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
         }
     }
 
-        printf("ABOUT TO INCR 2");
         glob_mes_to_receive++;
         
         //recv(client_sock, &(result[res].payload[0]), sizeof(result[res].payload[0]), 0);
@@ -374,23 +354,23 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
         char send_buffer[send_message.length + 1];
         //memcpy(send_buffer, result[res].payload, 4*result[res].num_tuples);
         
-        printf("send_buffer: %i\n", send_buffer[0]);
+      
         send_message.payload = operator.file_name;
-        printf("send_buffer: %s\n", send_message.payload);
+        
         send_message.status = OK_LOAD;
         if (send(client_sock, &(send_message), sizeof(message), 0) == -1) {
-            return "wtf";
+            return "error";
         }
-        printf("yuh99: %lu\n", sizeof(send_buffer));
+        
 
         if (send(client_sock, send_message.payload, send_message.length, 0) == -1) {
-            return "wtf2";
+            return "error";
         }
         glob_mes_to_receive++;
         //size_t len;
  
     
-        printf("This is the seg\n");
+       
         return "Load Complete";
      
 
@@ -404,12 +384,12 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
 
 
         if (need_res_ind == -1) {
-            printf("Line 293 server.c\n");
+           
             strsep(&operator.col_name, ".");
-            printf("Line 295 server.c %s\n", operator.col_name);
+            
             char* tbl_name = strsep(&operator.col_name, ".");
 
-            printf("line 292 server.c tbl name: %s\n", tbl_name);
+           
             int col_ind = find_column(tbl_name, operator.col_name);
 
             int tbl_ind = lookup_table(tbl_name);
@@ -463,7 +443,7 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
     } else if (query && query->type == INDEX) {
         IndexOperator operator = query->operator_fields.index_operator;
 
-        printf("line 378 server.c col_name: %s\n", operator.column_to_index->name);
+       
         operator.column_to_index->type = operator.type;
         operator.column_to_index->clustered = operator.is_clustered;
         operator.tbl->col_names_to_index[operator.tbl->index_create] = malloc(HANDLE_MAX_SIZE);
@@ -471,24 +451,20 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
         operator.tbl->index_create++;
 
         handle_index(operator.column_to_index, operator.tbl, operator.type, operator.is_clustered);
-        printf("after line 396 server.c\n");
+        
         return "index created";
 
     } else if (query && query->type == JOIN) {
         JoinOperator operator = query->operator_fields.join_operator;
-        printf("in the join op\n");
+        
         if (operator.fetch1->num_tuples < operator.fetch2->num_tuples) {
-            printf("SMALL1 FIRST BRANCH\n");
-            printf("len1: %i\n", operator.fetch1->num_tuples);
-            printf("len1: %i\n", operator.fetch2->num_tuples);
+            
             
             _join(operator.store_as1, operator.store_as2, operator.fetch1, operator.fetch2, operator.sel1, 
                 operator.sel2, operator.method, query->context->chandle_table, query->context->chandles_in_use);
       
         } else {
-            printf("SMALL2 SECOND\n");
-            printf("len1: %i\n", operator.fetch1->num_tuples);
-            printf("len1: %i\n", operator.fetch2->num_tuples);
+           
             _join(operator.store_as2, operator.store_as1, operator.fetch2, operator.fetch1, operator.sel2, 
                 operator.sel1, operator.method, query->context->chandle_table, query->context->chandles_in_use);
             
@@ -502,8 +478,7 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
         return "updte";
     } else if (query && query->type == DELETE) {
         DeleteOperator operator = query->operator_fields.delete_operator;
-        printf("name of tbl in delete: %s\n", operator.tbl->name);
-        printf("tbl lngth : %i\n", operator.tbl->table_length);
+       
         delete_update(operator.tbl, operator.res);
         return "65";
 
@@ -565,14 +540,14 @@ void handle_client(int client_socket) {
             length = recv(client_socket, recv_buffer, recv_message.length,0);
             recv_message.payload = recv_buffer;
             recv_message.payload[recv_message.length] = '\0';
-            printf("received from client: %s\n", recv_message.payload);
+            
             table = &(current_db->tables[lookup_table(recv_message.payload)]);
-            printf("Table name in server: %s\n", table->name);
+            
             continue;
         } else if (recv_message.status == OK_LOAD || recv_message.status==OK_NEW_COL) {
             fl = true;
             if (recv_message.status == OK_NEW_COL) {
-                printf("!!!!!incremented load counter\n");
+                
                 load_counter++;
                 offset = 0;
             }
@@ -608,18 +583,22 @@ void handle_client(int client_socket) {
             //fill_op_quer(current_db->query_batch, &send_message, client_socket, client_context);
 
             
+           
+
             //printf("parse succesful line 470 server.c: %s\n", current_db->op_quer[0]->operator_fields.select_operator.table->name);
+           
+            // once batch execute is called
             dispatch_threads(client_socket, client_context);
-            printf("donep2\n");
+
             wait_all();
-            printf("donep3\n");
+     
            // current_db->op_quer[0]->context->chandles_in_use += current_db->num_in_batch;
             client_context->chandles_in_use += current_db->num_in_batch;
             current_db->num_in_batch = 0;
             send_message.status = OK_DONE;
             send_message.length = 4;
             send_message.payload = "done";
-            printf("line 481 server.c: %s\n",client_context->chandle_table[0].nm);
+           
              if (send(client_socket, &(send_message), sizeof(message), 0) == -1) {
                     log_err("Failed to send message.");
                     exit(1);
@@ -633,27 +612,10 @@ void handle_client(int client_socket) {
             continue;
         }
 
-        // if (recv_message.status != OK_LOAD && fl) {
-        //     fl = false;
-        //             for (int i = 0; i != current_db->tables_size; i++) {
-        //         printf("inf: %i,%i\n", i,current_db->tables[i].index_create);
-        //         for (int j = 0; j < current_db->tables[i].index_create;j++) {
-        //             printf("index to be CREATED: %i,%i \n", i,j);
-                    
-        //             Column* col_for_ind = &current_db->tables[i].columns[find_column(current_db->tables[i].name, current_db->tables[i].col_names_to_index[j])];
-        //             handle_index(col_for_ind, &current_db->tables[i], col_for_ind->type, col_for_ind->clustered);
-        //         }
-        //         current_db->tables[i].index_create = 0;
-        //     }
-
-        // }
-        printf("line 473 server.c\n");
+    
         if (!done) {
             
-            // while (recv_message.status == HERETABLE || recv_message.status == OK_LOAD) {
-                
-              printf("recv\n");
-            // }
+         
             char recv_buffer[recv_message.length + 1];
             length = recv(client_socket, recv_buffer, recv_message.length,0);
             recv_message.payload = recv_buffer;
@@ -666,17 +628,16 @@ void handle_client(int client_socket) {
             }
 
             if (recv_message.status == OK_BATCH) {
-                printf("line 454 server.c ok_batch branch\n");
-                //length = recv(client_socket, recv_buffer, recv_message.length,0);
+               
                 if (length > 0) {
-                    printf("line 458 server.c: %s\n", current_db->name);
+                    
                     if(!current_db->query_batch) {
                         printf("but i just malloced line 460\n");
                     }
                     current_db->query_batch[current_db->num_in_batch] = malloc(strlen(recv_message.payload)+1);
-                    printf("line 460 server.c\n");
+                   
                     strcpy(current_db->query_batch[current_db->num_in_batch], recv_message.payload); 
-                    printf("line 462 server.c\n");
+ 
                     current_db->num_in_batch++;
                 }
 
@@ -698,32 +659,32 @@ void handle_client(int client_socket) {
             DbOperator* query = NULL;
            
            if (recv_message.status != OK_BATCH && recv_message.status != OK_BATCH_DONE){
-                printf("The status is not ok_batch\n");
+               
                 query = parse_command(recv_message.payload, &send_message, client_socket, client_context);
             } 
 
-            printf("line 412\n");
+        
             // 2. Handle request
             //    Corresponding database operator is executed over the query
             char* result = execute_DbOperator(query, client_socket);
-            printf("segfaul2\n");
+           
 
             if (!result) {
                 continue;
             }
 
             send_message.length = strlen(result);
-            printf("segfault4\n");
+      
             char send_buffer[send_message.length + 1];
-            printf("segfault5\n");
+           
             strcpy(send_buffer, result);
-            printf("segfault3\n");
+           
             send_buffer[send_message.length] = '\0';
             send_message.payload = send_buffer;
 
             
             if (recv_message.status == OK_BATCH) {
-                printf("batch cont received\n");
+               
                 send_message.status = OK_BATCH;
             } else {
                 send_message.status = OK_WAIT_FOR_RESPONSE;
@@ -837,20 +798,20 @@ void read_and_create(char* filename, int client_socket) {
          printf("%s\n", line);
          count_lines++;
     }
-    printf("yuh222\n");
+
     int number_of_columns = 0;
     //message_status status = OK_DONE;
     //char* result = malloc(strlen(line));
     char* result = strsep(&line, ",");
 
     
-    printf("yuh224: %s\n", result);
+
     char* db_name = strsep(&result, ".");
-    printf("yuhy225\n");
+
     char* table_name = strsep(&result, ".");
     char** cols = malloc(strlen(result));
     cols[number_of_columns] = result;
-    printf("yuh223: %s\n", result);
+
     int size_allocated = strlen(result);
     while ((result = strsep(&line, ",")) != NULL) {
         number_of_columns+=1;
@@ -859,17 +820,17 @@ void read_and_create(char* filename, int client_socket) {
         size_allocated += strlen(result);
         cols = realloc(cols, size_allocated);
         cols[number_of_columns] = result;
-        printf("Result in read: %s\n", result);
+        
     }
     number_of_columns+=1;
 
     char create_db_quer[13+strlen(db_name)];
     sprintf(create_db_quer, "create(db, %s)", db_name);
-    printf("db_query: %s\n", create_db_quer);
+    
 
     char create_tbl_quer[HANDLE_MAX_SIZE];
     sprintf(create_tbl_quer, "create(tbl, %s, %s, %i)", table_name, db_name, number_of_columns);
-    printf("tbl_query: %s\n", create_tbl_quer);
+    
 
     char** queries = malloc(strlen(create_tbl_quer) + strlen(create_tbl_quer));
     run_queries(create_db_quer, client_socket);
