@@ -798,15 +798,7 @@ void read_and_create(char* filename, int client_socket) {
 
 }
 
-// Currently this main will setup the socket and accept a single client.
-// After handling the client, it will exit.
-// You WILL need to extend this to handle MULTIPLE concurrent clients
-// and remain running until it receives a shut-down command.
-// 
-// Getting Started Hints:
-//      How will you extend main to handle multiple concurrent clients? 
-//      Is there a maximum number of concurrent client connections you will allow?
-//      What aspects of siloes or isolation are maintained in your design? (Think `what` is shared between `whom`?)
+
 int main(void)
 {
     // make sure server runs and waits for new client connections

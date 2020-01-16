@@ -5,7 +5,6 @@ machine please look into this as a a source of error. */
 
 /**
  * client.c
- *  CS165 Fall 2018
  *
  * This file provides a basic unix socket implementation for a client
  * used in an interactive client-server database.
@@ -37,13 +36,7 @@ machine please look into this as a a source of error. */
 
 #define DEFAULT_STDIN_BUFFER_SIZE 1024
 
-/**
- * connect_client()
- *
- * This sets up the connection on the client side using unix sockets.
- * Returns a valid client socket fd on success, else -1 on failure.
- *
- **/
+
 char* next_token(char** tokenizer, message_status* status) {
     char* token = strsep(tokenizer, ",");
     if (token == NULL) {
@@ -52,48 +45,61 @@ char* next_token(char** tokenizer, message_status* status) {
     return token;
 }
 
+// finds next string after periods
 char* next_per(char** token) {
     char* tokenn = strsep(token, ".");
     return tokenn;
 }
 
+// gets table name from db.tbl.col
 char* get_table_name(char* token) {
-  //  message_status status = OK_DONE;
-  //  printf("line 59 client.c: %s\n", token);
+  
     char** create_arguments_index = &token;
     char* tmp = strsep(create_arguments_index, ",");
     
 
-    //printf("line 62 client.c: \n");
-    //printf("line 63 string: %s\n", );
+ 
     char* beg = strsep(create_arguments_index, ".");
-    //printf("line 64 client.c\n");
+ 
     char* end = strsep(create_arguments_index, ".");
-    //printf("line 66 client.c\n");
+    
+    // copy table name
     char buf[strlen(beg)+strlen(end)+2];
-    //printf("line 68 client.c\n");
+ 
     strcpy(buf, beg);
-    //printf("line 70 client.c\n");
+ 
     strcpy(buf+strlen(beg), ".");
     strcpy(buf + strlen(beg) + 1, end);
     buf[strlen(beg) + strlen(end)+1] = '\0';
     char* bufferr = malloc(strlen(buf)+1);
+
+    if (!bufferr) {
+        return NULL;
+    }
     strcpy(bufferr, buf);
-    //printf("line 81 client.c: %i\n", strlen(buf));
+ 
     return bufferr;
 }
 
 char dir[] = "/cs165/generated_data/";
-//int dir_len = strlen(dir);
+ 
+/**
+ * connect_client()
+ *
+ * This sets up the connection on the client side using unix sockets.
+ * Returns a valid client socket fd on success, else -1 on failure.
+ *
+ **/
+
 int connect_client() {
     int client_socket;
     size_t len;
     struct sockaddr_un remote;
 
-  //  log_info("-- Attempting to connect...\n");
+ 
 
     if ((client_socket = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-        //fprintf(stderr, "%s\n", explain_socket(AF_UNIX, SOCK_STREAM, 0));
+        
         log_err("L%d: Failed to create socket.\n", __LINE__);
         return -1;
     }
@@ -111,6 +117,10 @@ int connect_client() {
 }
 
 
+/* 
+* This function takes a file name and generates the queries
+* needed to create necessary tables and columns
+*/
 char* read_and_create(char* filename, int num_tbls) {
     FILE* fp;
     char* line = NULL;
@@ -119,107 +129,94 @@ char* read_and_create(char* filename, int num_tbls) {
     if (!filename) {
         return NULL;
     }
+
+    // open csv file to load
     fp = fopen(filename, "r");
     if (!fp) {
         return NULL;
     }
-    //printf("read and create line 116\n");
+
     int count_lines = 0;
-    //int size_of_db = 0;
-   // char* what = malloc(12);
+ 
     // count the number of lines in the file
-    //printf("yuh101: %i\n", strlen(filename));
     while (count_lines != 1) {
         getline(&line, &len, fp);
-
-       // printf("Retrieved line of length %zu:\n", read);
-       //printf("%s\n", line);
-         count_lines++;
+        count_lines++;
     }
-    //printf("yuh222\n");
+ 
     int number_of_columns = 0;
-    //message_status status = OK_DONE;
-    //char* result = malloc(strlen(line));
+ 
     char* result = strsep(&line, ",");
 
-   // printf("line 135 client.c\n");
-    //printf("yuh224: %s\n", result);
+ 
     char* db_name = malloc(50);
+
+    if (!db_name) {
+        return NULL;
+    }
+
     db_name = strsep(&result, ".");
-   // printf("line 138 client.c: %s\n", db_name);
-    //printf("yuhy225\n");
+ 
     char* table_name = malloc(50);
     table_name = strsep(&result, ".");
 
-    // dont use realloc bro 
-    // and add flag so dont recreate db1
+    // allocate space to read in the data values
     char** cols = malloc(sizeof(char*)*4);
-
+    if (!cols) {
+        return NULL;
+    }
     cols[number_of_columns] = malloc(500);
     (cols[number_of_columns])[0] = '\0';
     strcpy(cols[number_of_columns],result);
-    //printf("line 150 client.c first column name: %s\n", cols[0]);
-   // printf("line 142 client.c\n");
-    //printf("yuh223: %s\n", result);
     int size_allocated = strlen(result);
-   // int col_num = 0;
+   
+   // fill columns with dara
     while ((result = strsep(&line, ",")) != NULL) {
         number_of_columns+=1;
         strsep(&result, ".");
         strsep(&result, ".");
         size_allocated += strlen(result);
-      //  printf("This is number_of_columns: %i\n", number_of_columns);
-       //  printf("line 166 client.c first column name: %s\n", cols[0]);
         cols[number_of_columns] = malloc(500);
         strcpy(cols[number_of_columns],result);
       //  printf("Result in read: %s\n", result);
     }
-    // printf("line 166 client.c first column name: %s\n", cols[0]);
+ 
     number_of_columns+=1;
-   // printf("line154 client.c\n");
-    //if (current_db->tables_size)
+ 
     char create_db_quer[13+strlen(db_name)];
     create_db_quer[0] = '\0';
-    //char db_name2[strlen(db_name)+1];
-
-    //db_name2[strlen(db_name)] = '\0';
-   sprintf(create_db_quer, "create(db, %s)\n", db_name);
-   // printf("db_query: %s::: %i\n", create_db_quer, jj);
+ 
+    sprintf(create_db_quer, "create(db, %s)\n", db_name);
+    
 
     char create_tbl_quer[HANDLE_MAX_SIZE] = {0};
-    //create_tbl_quer[0] = '\0';
+ 
     sprintf(create_tbl_quer, "create(tbl, %s, %s, %i)\n", table_name, db_name, number_of_columns);
-    //printf("tbl_query: %s\n", create_tbl_quer);
+ 
     char queries[2000];
     if (num_tbls != 0) {
         create_db_quer[0] = '\0';
         
     }
-   //  printf("line 187 client.c first column name: %s\n", cols[0]);
-    //run_queries(create_db_quer, client_socket);
-    //run_queries(create_tbl_quer, client_socket);
+ 
     queries[0] = '\0';
     strncpy(queries, create_db_quer, strlen(create_db_quer));
-    //printf("Line 187 client.c: %i\n", strlen(create_db_quer));
-
-    //printf("after one strcpy: %s", queries);
+ 
     strcpy(queries + strlen(create_db_quer), ";");
-   // printf("line 192 client.c\n");
+ 
     strcpy(queries+strlen(create_db_quer) + 1, create_tbl_quer);
-   // printf("line 194 client.c\n");
-    // queries[0] = create_db_quer;
-    // queries[1] = create_tbl_quer;
+ 
     int size_of_queries = strlen(create_tbl_quer) + strlen(create_db_quer)+1;
     strcpy(queries + size_of_queries, ";");
     size_of_queries++;
-    //printf("line 200 client.c\n");
+ 
+    // create columns queries
     for (int i = 0; i != number_of_columns; ++i) {
         char* temp_buf = malloc(HANDLE_MAX_SIZE + 50);
         temp_buf[0] = '\0';
-    //    printf("Iter %i, line 203 \n", i);
-     //   printf("This is the name of the column line 206: %s\n", cols[i]);
+ 
         sprintf(temp_buf, "create(col, %s, %s.%s)\n", cols[i], db_name, table_name);
-       // printf("Column query: %s\n", temp_buf);
+    
         strcpy(queries+size_of_queries, temp_buf);
         
         size_of_queries += strlen(temp_buf);
@@ -229,42 +226,34 @@ char* read_and_create(char* filename, int num_tbls) {
            
         
         size_of_queries++;
-        //free(temp_buf);
-        //queries = realloc(queries, size_of_queries);
-        //run_queries(temp_buf, client_socket);
-        //printf("query_col: %s\n", queries[i+2]);
+ 
     }
-    //printf("line217 client.c\n");
-    // char load_query[HANDLE_MAX_SIZE];
-    // sprintf(load_query, "load(%s)", filename);
-    // printf("File name in server main: %s\n", filename);
-    // run_queries(load_query, client_socket);
-    //run_queries("print()", client_socket);
+ 
     char load_query[HANDLE_MAX_SIZE];
     sprintf(load_query, "load(%s)", filename);
     strcpy(queries+size_of_queries, load_query);
     size_of_queries+=strlen(load_query);
     strcpy(queries+size_of_queries,";flag");
     fclose(fp);
-//    queries[0] = 'c';
-//    queries[1] = 'r';
+ 
     char* ret_val = malloc(size_of_queries+500);
-   // printf("QUERIES IN CLIENT: %s", queries);
-    strcpy(ret_val, queries);
-    //printf("this is return: %s\n", queries);
 
-    // for (int i = 0; i != number_of_columns; ++i) {
-    //     free(cols[i]);
-    // }
+    if (!ret_val) {
+        return NULL;
+    }
+ 
+    strcpy(ret_val, queries);
+ 
+ 
     free(cols);
     free(db_name);
-    // free(table_name);
-  //  printf("These are the queries line 237: %s\n", queries);
+ 
     return ret_val;
-
 
 }
 
+
+// this function is to persist indexes created by previous client
 char* load_index() {
     FILE* fp = fopen("index.txt", "r");
     if (!fp) {
@@ -273,11 +262,7 @@ char* load_index() {
     char* line = NULL;
     size_t len = 0;
     getline(&line, &len, fp);
-    //printf("length in load_ind: %i\n", len);
-    // if (len == -1) {
-    //     printf("empty file\n");
-    //     return NULL;
-    // }
+ 
     fclose(fp);
     //printf("LINE: %s\n", line);
     return line;
