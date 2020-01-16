@@ -264,7 +264,6 @@ char* load_index() {
     getline(&line, &len, fp);
  
     fclose(fp);
-    //printf("LINE: %s\n", line);
     return line;
 
 }
@@ -276,10 +275,9 @@ char* load_index() {
 **/
 int main(void)
 {
- //printf("uyes\n");
-    //printf("y: %i", global_result_counter );
+ 
     int client_socket = connect_client();
-//    printf("uyes\n");
+ 
     if (client_socket < 0) {
         exit(1);
     }
@@ -289,16 +287,12 @@ int main(void)
     size_t len2 = 0;
     ssize_t read;
 
-    //printf("gothere2\n");
+    // this is my file catologue which keeps track of tables and columns
     fp = fopen("catalogue.txt", "r");
-    //printf("%i\n", RAND_MAX);
-   
-    //printf("go3\n");
     int size_of_db = 0;
     if (fp) {
         int count_lines = 0;
         
-       // char* what = malloc(12);
         // count the number of lines in the file
         while (count_lines != 2) {
             read = getline(&line, &len2, fp);
@@ -306,31 +300,18 @@ int main(void)
                 size_of_db = atoi(line);
             }
 
-      //       printf("Retrieved line of length %zu:\n", read);
-        //     printf("%s", line);
-             count_lines++;
-             
-
+            count_lines++;
+            
         }
-        //printf("donezo\n");
         fclose(fp);
-       // message* stat;
-        if (line) {
-          //  printf("file to load: %s\n", line);
-        }
+      
     }
-    //printf("go4\n");
     char* flname= NULL;
-    //printf("mannnn0\n");
-
+    
     if (line) {
-      //  printf("mannn\n");
         flname= strsep(&line, ",");   
     }
-    //printf("this is flname: \n");
-   
-    //printf("output: %s\n", out);
-
+    
     message send_message;
     message recv_message;
 
@@ -346,7 +327,7 @@ int main(void)
 
     char *output_str = NULL;
     int len = 0;
-    bool flag = true;
+    bool flag = true; // flag for persistance (loads in files)
 
     // Continuously loop and wait for input. At each iteration:
     // 1. output interactive marker
@@ -354,32 +335,24 @@ int main(void)
     char read_buffer[DEFAULT_STDIN_BUFFER_SIZE];
     send_message.payload = read_buffer;
    
-    //printf("client acting weird\n");
-//    int dum_count = 0;
+
     int count99 = 0;
-    bool batch_mode = false;
+
+
+    bool batch_mode = false; // flag to signal batch queries
     char* out = read_and_create(flname,count99);
     while (flag || (printf("%s", prefix), output_str = fgets(read_buffer,
            DEFAULT_STDIN_BUFFER_SIZE, stdin), !feof(stdin)) ) {
-      //  printf("hmm\n");
-        // if (dum_count == 2) {
-        //     flag = false;
-        // }
-        // dum_count++; 
-        //printf("once ugin\n");
-
+ 
+        // check that db and tables exist in catologue
         if (size_of_db >= 0) { 
-            if (count99 > 0) {
-                //flname = strsep(&line, ",");
-                //printf("yuh flname: %s\n");
-                //out = read_and_create(flname);
-            }
+          
           
             if ((output_str == NULL) && flag && out) {
-              //  printf("SIZE OF DBB: %i\n", size_of_db);
+          
 
                 char* comp_str = strsep(&out, ";");
-             //  printf("THIS IS WHAT IS ABOUT TO BE READ BUFFER: %s\n", comp_str);
+ 
                 if (strcmp(comp_str, "") != 0) {
                     strcpy(read_buffer, comp_str);
                 } else {
@@ -387,78 +360,48 @@ int main(void)
                 }
                
                 if (strncmp(out, "flag",4) == 0) { 
-                //printf("GETOUT!\n");
+   
                     count99++;
                     size_of_db--;
                     flname = strsep(&line, ",");
-              //  printf("yuh flname: %s\n", flname);
-                //free(out);
+        
                 out = read_and_create(flname,count99);
-                //index_load_flag++;
-                //free(out);
+ 
                 }
 
+                // check if there are indexes to load
                  if (size_of_db==0 && index_load_flag == 0) {
-                  //  printf("index exists to load\n");
+  
                     out = load_index();
                     index_load_flag++;
-                    //size_of_db--;
+        
                 }
 
-               // printf("go execute\n");
-
-
-                //break;
+            
             }
            
         }
 
-       // printf("READ BUFFER ABOUT TO BE SENT IN CLIENT: %s\n", read_buffer);
-        // if (size_of_db > 0) {
-        //     flag = true;
-        // }
-        //printf("what\n");
+        // stop looping once catalogue data is loaded
         if (!out) {
-            //printf("out is done\n");
-            // if (size_of_db == 1) {
-            //     //printf("out is done2\n");
-            //     size_of_db = 0;
-            // }
             flag = false;
-            //printf("HJDKLSFAHDPGHAPOGFA\n");
-            // if (index_load_flag == 1) {
-
-            //     flag = false;
-   
-            // } else {
-            //     // out = load_index();
-            //     // index_load_flag = 1;
-            //     // if (out) {
-            //     //     printf("JKDSLHFASDK\n");
-            //     //     strcpy(read_buffer, out);
-            //     // }
-               
-            //  flag = false;
-            // }
         }
  
-        //printf("hmm\n");
         // Only process input that is greater than 1 character.
         // Convert to message and send the message and the
         // payload directly to the server.
 
         send_message.length = strlen(read_buffer);
         if (send_message.length > 1 || flag) {
-           // printf("This is the send mess payload line 401 client.c: %s\n", send_message.payload);
+            // these first couple of if statements set proper flags to signal to server
+            // in the case where batch querying is called
             if (strncmp(send_message.payload, "batch_e", 7) == 0) {
                 send_message.status = OK_BATCH_DONE;
                 batch_mode = false;
             } else if ((strncmp(send_message.payload, "batch_q", 7) == 0) || batch_mode) {
-             //   printf("ENTERING BATCH MODE CLIENT\n");
                 send_message.status = OK_BATCH;
                 batch_mode = true;
             }else {
-               // printf("NOT IN BATCH MODE CLIENT\n");
                  send_message.status = OK_DONE;
             }
             // Send the message_header, which tells server payload size
@@ -466,37 +409,26 @@ int main(void)
                 log_err("Failed to send message header.");
                 exit(1);
             }
-            //printf("Line 388 client.c printing send payload: %s\n", trim_quotes(trim_parenthesis(send_message.payload+4)));
             // Send the payload (query) to server
             if (send(client_socket, send_message.payload, send_message.length, 0) == -1) {
                 log_err("Failed to send query payload.");
                 exit(1);
             }
 
-          //  printf("line 425 client.c\n");
-          //  printf("torecev, %i\n",  glob_mes_to_receive);
-            //while (glob_mes_to_receive >= 0) {
             // Always wait for server response (even if it is just an OK message)
             int _done = 0;
-           // printf("line 433 client.cc\n");
+            // loop through to send info to server
             while (!_done){ 
-           //    printf("line 435\n");
             if ((len = recv(client_socket, &(recv_message), sizeof(message),0)) > 0) {
-              //  printf("line 401\n");
-              //  printf("line 433 client.c\n");
                 if ((recv_message.status == OK_WAIT_FOR_RESPONSE || recv_message.status == OK_DONE) &&
                     (int) recv_message.length > 0) {
                     // Calculate number of bytes in response package
                     int num_bytes = (int) recv_message.length;
                     char payload[num_bytes + 1];
                     _done = 1;
-             //       printf("line 445 client.c\n");
-                    // Receive the payload and print it out
                     if ((len = recv(client_socket, payload, num_bytes, 0)) > 0) {
                         payload[num_bytes] = '\0';
-            //            printf("%s\n", payload);
                     }
-              //      printf("line451\n");
                     if (strcmp(payload, "shutdown") == 0) {
  
                         close(client_socket);
@@ -511,7 +443,7 @@ int main(void)
 
                     // Receive the payload and print it out
                     if ((len = recv(client_socket, payload, num_bytes, 0)) > 0) {
-                        //payload[num_bytes] = '\0';
+                         
                         for (int i = 0; i != (num_bytes/4); ++i) {
                             if (recv_message.status == OK_MULTPRINT) {
                                 printf("%i,", payload[i]);
@@ -528,12 +460,11 @@ int main(void)
            
                     glob_mes_to_receive--;
                 } else if (recv_message.status == OK_LONG || recv_message.status == OK_LONG_MULTI) {
-                    //printf("RECIEVED IN CLIENT\n");
+            
                     int num_bytes = (int) recv_message.length;
-                    //printf("num bytes to receive: %i\n", num_bytes);
+           
                     long long payload[1];
-                    //recv_message.status == OK_DONE;
-                    //printf("entered client.c long\n");
+           
                     // Receive the payload and print it out
                     if ((len = recv(client_socket, payload, num_bytes, 0)) > 0) {
                         if (recv_message.status == OK_LONG) {
@@ -546,15 +477,14 @@ int main(void)
 
 
                 else if (recv_message.status == OK_FLOAT || recv_message.status == OK_NEWLINE) {
-                    //recv_message.status == OK_DONE;
+         
                     int num_bytes = (int) recv_message.length;
                     double payload[num_bytes];
 
 
                     // Receive the payload and print it out
                     if ((len = recv(client_socket, payload, num_bytes, 0)) > 0) {
-                        //payload[num_bytes] = '\0';
-                        //printf("NUM FLOAT BYTES RECIEVED: %i\n", num_bytes);
+            
                         for (int i = 0; i != num_bytes/8; ++i) {
                             if (recv_message.status == OK_FLOAT) {
                                 printf("%0.2lf,", payload[i]);     
@@ -569,29 +499,27 @@ int main(void)
                         }
                     }
                 } else if (recv_message.status == OK_BATCH) {
-               //     printf("line 499 client.c\n");
+ 
                     _done = 1;
                     char payload[recv_message.length + 1];
                     if ((len = recv(client_socket, payload, recv_message.length, 0)) > 0) {
-               //         printf("payload ok_batch: %s\n", payload);
+       
                     }
                 } else if (recv_message.status == OK_BATCH_DONE) {
-         //           recv_message.status == OK_DONE;
+ 
                     _done = 1;
                 }
                 else if (recv_message.status == OK_LOAD) {
-                    //printf("meh\n");
-             //       printf("line517\n");
-           //         recv_message.status == OK_DONE;
+ 
                     int num_bytes = (int) recv_message.length;
                     char payload[num_bytes + 1];
 
-                    // Receive the payload and print it out
+                    // Receive the payload  
                     if ((len = recv(client_socket, payload, num_bytes, 0)) > 0) {
                         payload[num_bytes] = '\0';
-                  //      printf("%s\n", payload);
+ 
                     }
-                    //char dir[] = "/cs165/generated_data/";
+                    
                     char* src = "";
                     int dir_len = strlen(src);
                     char buf[strlen(payload) + dir_len + 1];
@@ -601,49 +529,44 @@ int main(void)
                     FILE * fp;
                     char * line = NULL;
                     size_t len = 0;
-                  //  ssize_t read;
+            
                     char rel_ins2[19];
                     strcpy(rel_ins2, "relational_insert(");
                     rel_ins2[18] = '\0';
-                    // char* rel_ins2 = "relational_insert(";
-                    // 
-              //      printf("line 543\n");
-                //printf("meh2\n");
-                    //strcat(dir,payload);
+ 
 
-
-                    //printf("director: %s\n", payload);
                     fp = fopen(payload, "r");
 
                     if (!fp) {
-             //           printf("line552\n");
+ 
                         return -1;
                     }
                     int count_lines = 0;
                     int size_of_db = 0;
                     int number_of_columns = 0;
+
                     // count the number of lines in the file and send the table name
                     while ((read = getline(&line, &len, fp)) != -1) {
-                 //       printf("line 560\n");
+ 
                         if (count_lines == 0) {
-              //              printf("line 562\n");
-                           // printf("Line 448 client.c: %s\n", line);
+ 
                             char line_cop[strlen(line)+1];
                             strcpy(line_cop, line);
-              //              printf("line 566: %s\n", line_cop);
+ 
                             char* tmp = get_table_name(line_cop);
-             //               printf("line 568: %s\n", tmp);
+ 
                             size_of_db = strlen(tmp);
                             while (line) {
-                              //  printf("Line 448 client.c: %s\n", line);
+ 
                                 number_of_columns += 1;
-                  //              printf("line 573\n");
+ 
                                 strsep(&line, ",");
                             }
-                 //           printf("line 573\n");
+  
                             char tbl_name[size_of_db+1];
                             strcpy(tbl_name, tmp);
                             tbl_name[size_of_db] = '\0';
+
                             // send table name to socket
                             char* tbl_need = tbl_name;
                             strsep(&tbl_need, ".");
@@ -651,99 +574,81 @@ int main(void)
                             send_table.status = HERETABLE;
                             send_table.payload = tbl_need;
                             send_table.length = strlen(tbl_need);
-                 //         printf("THIS IS THE TABLE NAME IN CLIENT: %s\n", tbl_need);
+   
                             if (send(client_socket, &(send_table), sizeof(message), 0) == -1) {
                                 return -1;
                             }
-                            //printf("yuh99: %i\n", strlen(rel_ins_statement));
+        
 
                             if (send(client_socket, send_table.payload, send_table.length, 0) == -1) {
                                 return -1;
                             }
 
                         }
-                      //   printf("Retrieved line of length %zu:\n", read);
-                        // printf("%s", line);
-                         //printf("is it being incremented?\n");
+             
                          count_lines++;
                     }
 
                     fclose(fp);
+
+                    // allocate space for the data that will be loaded
                     int** columns_to_send = malloc(sizeof(int*)*number_of_columns);
-                    //printf("value of count_lines in client.c: %i\n", number_of_columns);
+                    
+                    if (!columns_to_send){
+                        return -1;
+                    }
                     for (int i = 0; i != number_of_columns; ++i) {
                         columns_to_send[i] = malloc(sizeof(int)*count_lines);
                     }
-                    // if (fp == NULL)
-                    // //   exit(EXIT_FAILURE);
-  //                  char rel_ins[strlen(rel_ins2) + size_of_db + 2];
-                   // rel_ins[0] = '\0';
-                    //printf("this is the payload: %s\n", payload);
+ 
                     fp = fopen(payload, "r");
 
                     if (!fp) {
                         return -1;
                     }
                     int skip_first_line = 0;
-                    //int number_of_columns = 1;
+          
                     int count_where = 0;
 
-                   // printf("client opening file second time to send\n");
                     while ((read = getline(&line, &len, fp)) != -1) {
                 
                          
-                       // printf("client entered file open while loop 2\n");
+      
                          if (skip_first_line > 0) {
-                         //   int nums_to_send[number_of_columns];
+
                             int k = 0;
                             while (line) {
-                             //   printf("Line 540 of client.c\n");
-                                //printf("This is the value of k in client: %i\n", count_where);
+                                // sending ascii text over the socket slows down my load
+                                // function so sending integers over socket instead
                                 (columns_to_send[k])[count_where] = atoi(strsep(&line, ","));
-                               // printf("This is line: %s\n", line);
-                                //nums_to_send[k] = atoi(strsep(&line, ","));
-                               // printf("num:%i\n", (columns_to_send[k])[count_where]);
-                               // printf("This is the value of k in client: %i\n", k);
+               
                                 k++;
                             }
-                            //printf("\n");
-                            
-                           // printf("Line 551 client.c\n");
-                            //char send_buffer[send_message2.length + 1];
-                            //memcpy(send_buffer, result[res].payload, 4*result[res].num_tuples);
-                            // char rel_ins_statement[strlen(rel_ins) + read + 2];
-                            // strcpy(rel_ins_statement, rel_ins);
-                            // strcpy(rel_ins_statement+strlen(rel_ins), line);
-                            // rel_ins_statement[strlen(rel_ins)+read] = ')';
-                           // rel_ins_statement[strlen(rel_ins)+read+1] = '\0';                   
-                           // printf("send_buffer: %s\n", rel_ins);
+                  
                             count_where++; 
                          }
-                        // printf("Line 562 client.c\n");
+        
                          skip_first_line++;
                          
                      }
-
-                    // for (int i = 0; i != 1000; ++i) {
-                    //     printf("This is the val of column in client: %i\n", (columns_to_send[0])[i]);
-                    // }
-                    //printf("COMPLETE SENT \n");
+ 
                     fclose(fp);
-                   // printf("Line 572 client.c\n");
+                        
                         for (int i = 0; i != number_of_columns; ++i) {
                             int total_to_send = 4*count_lines-1;
                             int* tmp_buffer = columns_to_send[i];
-                           // printf("value of i in client: %i\n", i);
+                       
                             int counter101 = 0;
-                          //  printf("line 578 client.c\n");
+                      
+                            // keep looping until theres no more data to send to server
                             while (total_to_send > 0) {
-                               // printf("total_to_send: %i", total_to_send);
+                  
                                 message send_message2;
               
                                 if (counter101 == 0) {
                                     counter101++;
                                     send_message2.status = OK_NEW_COL;
-                                   // printf("the number of times i see the OK_NEW_COL: %i", i);
+                           
                                 } else {
                                     send_message2.status = OK_LOAD;    
                                 }
@@ -768,7 +673,7 @@ int main(void)
                                 if (send(client_socket, &(send_message2), sizeof(message), 0) == -1) {
                                     return -1;
                                 }
-                                //printf("yuh99: %i\n", strlen(rel_ins_statement));
+                     
 
                                 if (send(client_socket, send_message2.payload2, send_message2.length, 0) == -1) {
                                     return -1;
