@@ -50,37 +50,28 @@ int global_result_count = 0;
  **/
 
 
-
+/** QUERY OPTIMIZER
+* Generates proxy of the selectivity of range query.  
+* Using this we can choose whether to use index or do full scan of data
+**/
 float proxy_selectivity(int* data, int lower, int upper, int length) {
     int index = 0;
     int num_qual = 0;
     srand(time(NULL));
     for (int i = 0; i != SAMPLE_SIZE; i++) {
         index = rand() % (length+1);
-        // printf("line 58 query optim: %i\n", index);
-        // printf("contents: %i\n", data[i]);
+ 
         num_qual += ((data[index] >= lower && data[index] < upper) ? 1:0);
     }
-    // printf("LENGTH: %i\n", length);
-    // printf("NUM_QUAL: %i\n", RAND_MAX);
+ 
 
     return (((1.0)*num_qual)/SAMPLE_SIZE);
 
 }
 
 
+// executes query
 char* execute_DbOperator(DbOperator* query, int client_sock) {
-    // there is a small memory leak here (when combined with other parts of your database.)
-    // as practice with something like valgrind and to develop intuition on memory leaks, find and fix the memory leak. 
-    // if (query->context->chandles_in_use == 0) {
-    //     for (int i =0; i != 2003; ++i) {
-    //         table_lookup[i] = NULL;
-    //         column_lookup[i] = NULL;
-             
-    //     }
-    //     //query->context->chandles_in_use = 0;
-    //     global_result_count++;
-    // }
 
 
     if(!query)
@@ -139,51 +130,36 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
             return ret.error_message;
         } 
         
-        // printf("length of table is now: %i\n", )
-        // for (int i = 0; i < (int)operator.table->table_length;i++) {
-        //     operator.table->columns[i].num_in_pool++;
-        // }
 
         return "Insertion Successful";
     } else if (query && query->type == SELECT) {
         
         SelectOperator operator = query->operator_fields.select_operator;
         current_db->off = true;
-        // if (operator.column) {
-        //     if (operator.column->num_in_pool > 0) {
-                
-        //         printf("yuh");
-        //       //  handle_index(operator.column, operator.table, operator.column->type, operator.column->clustered);
-        //         operator.column->num_in_pool = 0;
-        //     }
-        // } else {
-        //     printf("column is null: \n");
-        // }
-
-       // (query->context->chandle_table)[global_result_counter] = (Result*) malloc(sizeof(Result));
-        //query->context->chandle_table->nm = malloc(HANDLE_MAX_SIZE);
+       
+       // select function based on another range query
        if (operator.res_bitvector) {
-            printf("line 164 server.c\n");
+            
             _select2(operator.res_bitvector, operator.res_for_range, query->context->chandle_table, 
                     query->context->chandles_in_use, operator.interm, operator.lower, 
                     operator.upper);
        } else {
+            // find selectivity 
             float selectivity = proxy_selectivity(operator.column->data, operator.lower, operator.upper, operator.table->table_length);
-            printf("SELECTIVITY IN SERVER.C: %f\n", selectivity);
+
+
             if (operator.column->clustered && !current_db->off) {
-                printf("SELECT CLUSTERED\n");
+
                 clustered_select(query->context->chandle_table, query->context->chandles_in_use, operator.table,
                  operator.column, operator.interm, operator.lower, operator.upper);
             } else if (!operator.column->clustered && (operator.column->type != NOIDX) && !current_db->off) {
-                printf("SELECT UNCLUSTERED\n");
+
                 unclust_select(query->context->chandle_table, query->context->chandles_in_use, operator.table,
                  operator.column, operator.interm, operator.lower, operator.upper);
             } else {
-                printf("NORMAL SELECT: %i\n", operator.table->table_length);
+
                 selectt(query->context->chandle_table, query->context->chandles_in_use, operator.table, operator.column,
                          operator.interm, operator.lower, operator.upper);
-                 // unclust_select(query->context->chandle_table, query->context->chandles_in_use, operator.table,
-                 // operator.column, operator.interm, operator.lower, operator.upper);
             }
        }
        
@@ -192,34 +168,21 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
 
 
         query->context->chandles_in_use++;
-        printf("its not possible: %s\n", query->context->chandle_table[0].nm);
+ 
         return "select successful";        
     } else if (query && query->type == FETCH) {
-        printf("help1\n");
+ 
         FetchOperator operator = query->operator_fields.fetch_operator;
-        printf("    RESULT NAME IN FETCH: %s\n", operator.res_name);
+ 
         int need_res_ind = find_result(query->context->chandle_table, operator.res_name, query->context->chandles_in_use);
-
-        // int needed_result_index = 0;
-
-        // //printf("%i\n", result_lookup[0]->num_tuples);
-        // for (int i = 0; i != global_result_counter; ++i) {
-        //     printf("help5\n");
-        //     char* comp_name = query->context->chandle_table[i].nm;
-        //     printf("nnnnnn : %s\n", query->context->chandle_table[i].nm);
-        //     if (strcmp(comp_name, operator.res_name) == 0) {
-        //         printf("help4\n");
-        //         needed_result_index = i;
-        //         break;
-        //     }
-        // }
-        printf("help3\n");
+ 
 
         if (need_res_ind == -1) {
             return "fetch failure";
         }
-        // Result* reslt = (Result *) malloc(sizeof(Result));
-        printf("help3\n");
+
+        // perform appropriate fetch based on select type
+        
         if (query->context->chandle_table[need_res_ind].select_type == RANGE) {
             cluster_fetch(query->context->chandle_table, query->context->chandles_in_use, operator.table, 
             operator.column, operator.interm, &query->context->chandle_table[need_res_ind]);
@@ -233,15 +196,11 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
                 &query->context->chandle_table[need_res_ind]);
         }
         query->context->chandles_in_use++;
-        // for (int i = 0; i <= 20; ++i) {
-
-        //     printf("This is the first id: %i\n", query->context->chandle_table[1].payload[i]);
-    
-        // }
+ 
         return "fetch complete";
     } else if (query && query->type == PRINT) {
         PrintOperator operator = query->operator_fields.print_operator;
-        //int res = _printt(query->context->chandle_table, query->context->chandles_in_use, operator.name_to_load);
+        
         for (int i = 0; i != operator.num_to_print; i++) {
             int res = find_result(query->context->chandle_table, operator.names_to_load[i], query->context->chandles_in_use);
             Result* result = query->context->chandle_table;
@@ -249,18 +208,19 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
                 return "print failure";
             }
             size_t total_to_send;
-            if (result[res].data_type == LONG || result[res].data_type == FLOAT) {
 
-               // printf("NUM TO PRINT: %i\n", operator.num_to_print);
-               // printf("NUM TUPLES: %li\n", result[res].num_tuples);
-             total_to_send = 8*result[res].num_tuples;
+            // calculate how many bytes I need to send over the socket
+            if (result[res].data_type == LONG || result[res].data_type == FLOAT) {
+                total_to_send = 8*result[res].num_tuples;
             } else {
                 total_to_send = 4*result[res].num_tuples;
             }
-            printf("This is num_tuples in server: %li\n", total_to_send);
+    
             int* results_payload = result[res].payload;
+
+            // keep looping and sending packets of size 1024 bytes to the client
             while (total_to_send > 0) {
-               // printf("TOTAL TO SEND: %li\n", total_to_send);
+         
                 message send_message;
                 if (total_to_send < 1024) {
 
@@ -271,9 +231,9 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
                 
                 int send_buffer[send_message.length + 1];
                 memcpy(send_buffer, results_payload, send_message.length);
-                
-               // printf("send_buffer: %i\n", send_buffer[0]);
 
+                // depending on data type I will have to send different number of bytes
+                // Also have different messages to signal to the client
                 if (result[res].data_type == INT) {
                     send_message.payload2 = send_buffer;
 
@@ -288,8 +248,6 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
                     if (send(client_sock, &(send_message), sizeof(message), 0) == -1) {
                         return "error";
                     }
-           
-                   // printf("yuh99: %lu\n", sizeof(send_buffer));
 
                 
                     if (send(client_sock, send_message.payload2,send_message.length, 0) == -1) {
@@ -298,20 +256,17 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
                     
                 } else if (result[res].data_type == LONG ) {
                     send_message.payload4 = result[res].payload_long;
-                 //   printf("server.c send long: %lli\n", send_message.payload4[0]); 
+                  
                     if (i < (operator.num_to_print - 1)) {
                         send_message.status = OK_LONG_MULTI;
                     } else {
                         send_message.status = OK_LONG;   
                     }
-                   //send_message.length *=2;
+                 
                     if (send(client_sock, &(send_message), sizeof(message), 0) == -1) {
                         return "error";
                     }
-           
-                   
-
-                
+   
                     if (send(client_sock, send_message.payload4, send_message.length, 0) == -1) {
                         return "error";
                     }
@@ -336,23 +291,22 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
                 }
                 results_payload += (send_message.length/4);
                 total_to_send -= send_message.length;
-               // printf("total_to_send: %li\n", total_to_send);
+            
         }
     }
 
         glob_mes_to_receive++;
         
-        //recv(client_sock, &(result[res].payload[0]), sizeof(result[res].payload[0]), 0);
-        //printf("print in server: %i\n", result[res].payload[0]);
+ 
         return "print completed";
     } else if (query->type == LOAD && query) {
         LoadOperator operator = query->operator_fields.load_operator;
-        //void* recvm = malloc(sizeof(message));
+ 
         message send_message;
         current_db->wt = 0;
         send_message.length = strlen(operator.file_name);
         char send_buffer[send_message.length + 1];
-        //memcpy(send_buffer, result[res].payload, 4*result[res].num_tuples);
+ 
         
       
         send_message.payload = operator.file_name;
@@ -367,7 +321,7 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
             return "error";
         }
         glob_mes_to_receive++;
-        //size_t len;
+    
  
     
        
@@ -375,6 +329,8 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
      
 
     } else if (query && query->type == ARITH) {
+
+        // takes care of max,min,avg, and sum operators
         ArithOperator operator = query->operator_fields.arith_operator;
         char buff[strlen(operator.col_name) + 1];
         strcpy(buff, operator.col_name);
@@ -406,9 +362,7 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
             
         } 
         do_arith(query->context->chandles_in_use, ((char*) operator.op), operator.store_as, &(query->context->chandle_table[need_res_ind]), query->context->chandle_table);
-        // for (int i = 0; i != (int)query->context->chandle_table[need_res_ind].num_tuples; ++i) {
-        //     printf("server arith: %i\n", query->context->chandle_table[need_res_ind].payload[i]);
-        // }
+ 
         query->context->chandles_in_use++;
         return "completed";
     }  else if (query && query->type == SHUTDOWN) {
@@ -421,7 +375,8 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
         
         return "shutdown";
     } else if (query && query->type == BINOP) {
-         BinopOperator operator = query->operator_fields.binop_operator;
+        // takes care of add and sub operators
+        BinopOperator operator = query->operator_fields.binop_operator;
         int res1_ind = find_result(query->context->chandle_table, operator.col1_name, query->context->chandles_in_use);
         int res2_ind = find_result(query->context->chandle_table, operator.col2_name, query->context->chandles_in_use);
 
@@ -457,6 +412,7 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
     } else if (query && query->type == JOIN) {
         JoinOperator operator = query->operator_fields.join_operator;
         
+        // make sure to build hash table on smaller column
         if (operator.fetch1->num_tuples < operator.fetch2->num_tuples) {
             
             
@@ -485,7 +441,7 @@ char* execute_DbOperator(DbOperator* query, int client_sock) {
     } else {    
         return "165";
     }
-    printf("Segfault?\n");
+ 
     free(query);
     return "165";
 }
@@ -524,7 +480,7 @@ void handle_client(int client_socket) {
     int offset = 0;
     bool fl = false;
     do {
-       // printf("reiterate\n");
+       
         length = recv(client_socket, &recv_message, sizeof(message), 0);
         if (length < 0) {
             log_err("Client connection closed!\n");
@@ -533,6 +489,9 @@ void handle_client(int client_socket) {
             printf("not done\n");
             done = 1;
         }
+        /**
+        * This is the server receiving data (client is sending csv file data over socket)
+        **/
         if (recv_message.status==HERETABLE) {
 
             load_counter=-1;
@@ -554,45 +513,28 @@ void handle_client(int client_socket) {
             int recv_buffer[recv_message.length/4];
            
            
-            // printf("the length to receive is: %i\n", recv_message.length);
+ 
             
             length = recv(client_socket, recv_buffer, recv_message.length,0);
             recv_message.payload2 = recv_buffer;
-            // printf("value 4 in recv: %i\n", recv_message.length);
-            //recv_message.payload[recv_message.length] = '\0';
+ 
             load_columns(table, recv_buffer, load_counter, offset, recv_message.length);
            
             
             offset += (recv_message.length/4);
 
-            //printf("value in my loaded column: %i\n", table->columns[0].data[1]);
+ 
             continue;
         } else if (recv_message.status == OK_BATCH_DONE) {
             char recv_buffer[recv_message.length];
             length = recv(client_socket, recv_buffer, recv_message.length,0);
-            // while (current_db->num_in_batch > 0) {
-            //     DbOperator* query = parse_command(current_db->query_batch[count_ex], &send_message, client_socket, client_context);
-            //     char* result = execute_DbOperator(query, client_socket);
-            //     printf("segfaul2\n");
-
-            //     current_db->num_in_batch--;
-            //     count_ex++;
-            // }
-         
-
-            //fill_op_quer(current_db->query_batch, &send_message, client_socket, client_context);
-
-            
-           
-
-            //printf("parse succesful line 470 server.c: %s\n", current_db->op_quer[0]->operator_fields.select_operator.table->name);
-           
-            // once batch execute is called
+   
+            // once batch execute is called dispatch threads and wait for all of them to complete
             dispatch_threads(client_socket, client_context);
 
             wait_all();
-     
-           // current_db->op_quer[0]->context->chandles_in_use += current_db->num_in_batch;
+            
+            // add queries to the variable pool
             client_context->chandles_in_use += current_db->num_in_batch;
             current_db->num_in_batch = 0;
             send_message.status = OK_DONE;
@@ -641,10 +583,7 @@ void handle_client(int client_socket) {
                     current_db->num_in_batch++;
                 }
 
-                // for (int i = 0; i != current_db->num_in_batch; i++) {
-                //     printf("Name of column in batch: %s\n", current_db->query_batch[i]);
-                // }
-                
+          
             }
             
             // 1. Parse command
@@ -693,16 +632,16 @@ void handle_client(int client_socket) {
             if (recv_message.status != OK_LOAD && recv_message.status != OK_INT && recv_message.status != OK_BATCH_DONE && recv_message.status != CLIENT_S) {
 
             // 3. Send status of the received message (OK, UNKNOWN_QUERY, etc)
-                printf("sending response in server.c\n");
+    
                 if (send(client_socket, &(send_message), sizeof(message), 0) == -1) {
-                    printf("sending response in server.c\n");
+                 
                     log_err("Failed to send message.");
                     exit(1);
                 }
 
                 // 4. Send response to the request
                 if (send(client_socket, result, send_message.length, 0) == -1) {
-                    printf("sending response in server.c\n");
+           
                     log_err("Failed to send message.");
                     exit(1);
                 }
@@ -717,7 +656,7 @@ void handle_client(int client_socket) {
             glob_mes_to_receive++;
         }
     } while (!done);
-    printf("socket closed\n");
+   
 
     close(client_socket);
 }
@@ -870,6 +809,7 @@ void read_and_create(char* filename, int client_socket) {
 //      What aspects of siloes or isolation are maintained in your design? (Think `what` is shared between `whom`?)
 int main(void)
 {
+    // make sure server runs and waits for new client connections
     while (true) {
         int server_socket = setup_server();
         if (server_socket < 0) {
