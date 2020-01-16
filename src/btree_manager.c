@@ -17,6 +17,7 @@ void create_tuple(ClusterTuple* cmp, int* data, int num_elts) {
 		cmp[i].id = i;
 	}
 }
+
 int max(int* data, int num_vals) {
 	int cur = INT_MIN;
 
@@ -46,7 +47,7 @@ int binary_search2(ClusterTuple* search_array, int target, int len) {
     }
 
  
-
+    // make sure to find the first instance (value might be repeated several times)
     if (result >= 0) {
 	    while (search_array[result].val >= target ) {
 	    	result--;
@@ -76,7 +77,7 @@ int binary_search(int* search_array, int target, int len) {
         } 
     }
  
-
+    // takes care of repeated values
     if (result >= 0) {
 	    while (search_array[result] >= target ) {
 	    	result--;
@@ -104,6 +105,7 @@ int comparator_uncl(const void *p, const void *q) {
 	}
 }
 
+// comparator for clustered index qsort call
 int comparator_clust(const void *p, const void *q) {
 	const ClusterTuple* cl1 = (const ClusterTuple*) p;
 	const ClusterTuple* cl2 = (const ClusterTuple*) q;
@@ -117,27 +119,42 @@ int comparator_clust(const void *p, const void *q) {
 	}
 }
 	
-
-
+// loads the btree leafs (cache-conscious)
+// inputs: column and number of items to insert
+// returns: head BtreeNode pointer.
 BtreeNode* load_btree_base(Column* col, int num_elts) {
 	ClusterTuple* ct = NULL;
+
+	// if not clustered index then I want to load (val, id) in the leafs
 	if (!col->clustered) {
-		//printf("enter not clustered line 86\n");
 		ct = malloc(sizeof(ClusterTuple)*num_elts);
 		create_tuple(ct, col->data, num_elts);	
 		qsort((void*) ct, num_elts,sizeof(col->index->sorted[0]), comparator_uncl);
 	}
 	int num_cpy = num_elts;
-	//printf("num elts: %i\n", num_elts);
+	
 	int* tmp_col = malloc(sizeof(int)*num_elts);
+	if (!tmp_col) {
+		return NULL;
+	}
+
+	// copy and sort the data
 	memcpy(tmp_col, col->data, num_elts*4);
 	qsort((void*) tmp_col, num_elts, sizeof(int), comparator_uncl);
 	int num_nodes_ini = (num_elts % (PAGESIZE/4) == 0) ? 0:1;
 	int num_nodes = num_elts/(PAGESIZE/4) + num_nodes_ini;
+
+	// allocate space for the leaves
 	BtreeNode* leafs = malloc(sizeof(BtreeNode) * num_nodes);
+
+	if (!leafs) {
+		return NULL;
+	}
+
 	int per_page = 0;
 	for (int i = 0; i != num_nodes; i++) {
  
+ 		// keep track of the last node in the leaf blocks
 		if (i == num_nodes-1) {
 				leafs[i].last_node = true;
 			} else {
@@ -145,10 +162,10 @@ BtreeNode* load_btree_base(Column* col, int num_elts) {
 			}
 		int temp_val = (num_cpy > (PAGESIZE/4)) ? (PAGESIZE/4):num_cpy;
 	 
+	 	// place values in leafs
 		memcpy(leafs[i].data, tmp_col + per_page, temp_val*4);
 		
-
- 
+		// store ids for unclustered btree
 		if (!col->clustered) {
 			for (int k = 0; k != temp_val; k++) {
 				leafs[i].orig_ids[k] = ct[per_page+k].id;
@@ -170,6 +187,10 @@ BtreeNode* load_btree_base(Column* col, int num_elts) {
 	return leafs;
 }
 
+// load parent nodes
+// input: leafs and number of leafs
+// returns: root BtreeNode
+// this process is similar to loading the leafs
 BtreeNode* load_btree_internal(BtreeNode* lfs, int num_elts) {
 	int num_nodes = 2;
 	BtreeNode* internals = NULL;
@@ -197,11 +218,10 @@ BtreeNode* load_btree_internal(BtreeNode* lfs, int num_elts) {
 				 
 				leaf_index++;
 			}
-			//leaf_index++;
+			
 			internals[j].leaf=false;
 			internals[j].num_elt = temp_val;
 
-			//printf("number of elements: %i\n", internals[j].num_elt);
 			num_cpy -= (temp_val+1);
 
 		}
@@ -214,68 +234,66 @@ BtreeNode* load_btree_internal(BtreeNode* lfs, int num_elts) {
 
 	return internals;
 }
-// void create_clustered_array(Column* col) {
-
-// }
 
 
 
-// fix unclustered.. what does 
+
+// unclustered index with array
 void create_unclustered_array(Column* col, int num_elts) {
-	//printf("line 30 helper function btree.c: %i\n", num_elts);
+	
 	col->index = malloc(sizeof(ColumnIndex));
-//	col->index->sorted = NULL;
-	// if (!current_db->unclust_exists) {
-	// 	printf("it is qsort with seg fault\n");
-	// 	qsort((void*) col->data, num_elts, sizeof(col->data[0]), comparator_uncl);
-	// 	printf("line 35 btree.c\n");
-	// 	current_db->unclust_exists = true;
-	// }
 
-
+	if (!col->index) {
+		printf("MALLOC FAILED\n");
+	}
 	col->index->sorted = malloc(sizeof(ClusterTuple) * num_elts);
-	//memcpy(col->index->sorted, col->data, sizeof(int)*num_elts);
+	
+	if (!col->index->sorted) {
+		printf("MALLOC FAILED\n");
+	}
+
+	// create (val, id) tuple
 	create_tuple(col->index->sorted, col->data, num_elts);	
 	qsort((void*) col->index->sorted, num_elts,sizeof(col->index->sorted[0]), comparator_uncl);
 
-
-	// for (int i = 0; i != 50; i++) {
-	// 	printf("This is sorted column data: %i\n", col->data[i]);
-	// }
-
-	// if (col->index->sorted) {
-	// 	for (int i = 0; i != 50; i++) {
-	// 		printf("This is sorted COPY of column data: %i\n", col->index->sorted[i]);
-	// 	}
-
-	// }
-
 }
 
+// unclustered index with btree
 void create_unclustered_btree(Column* col, int num_elts) {
+
+		// allocate space for index
 		col->index = malloc(sizeof(ColumnIndex));
 		col->index->data_tree = malloc(sizeof(BtreeNode));
+
+		if (!col->index || !col->index->data_tree) {
+			printf("MALLOC FAILED\n");
+		}
+
 		int num_nodes_ini = (num_elts % (PAGESIZE/4) == 0) ? 0:1;
 		int num_nodes = num_elts/(PAGESIZE/4) + num_nodes_ini;
 		BtreeNode* base = NULL;
 		BtreeNode* root = NULL;
-	//	printf("line 217 btree.c\n");
+		
+		// load btree
 		base = load_btree_base(col, num_elts);
-	//	printf("line 219 btree.c\n");
 		root = load_btree_internal(base, num_nodes);
 		col->index->data_tree = root;	
 }
 
 
-
+// create clustered index with array
 void create_clustered_array(Column* col, Table* tbl, int num_elts) {
 	ClusterTuple* cmp_array = malloc(sizeof(ClusterTuple)*num_elts);
+	if (!cmp_array) {
+		printf("MALLOC FAILED\n");
+	}
+
 	create_tuple(cmp_array, col->data, num_elts);
 	qsort((void*) cmp_array, num_elts, sizeof(cmp_array[0]), comparator_clust);
 	// create copy of table
 	tbl->cluster_copy = malloc(sizeof(Column)*tbl->col_count); 
 
-	printf("line 194 btree.c: %i\n", col->data[0]);
+	// create copy of the base data while propogating order of column
 	for (int j = 0; j != (int)tbl->table_length; j++) {
 		for (int i = 0; i != (int)tbl->col_count; i++) {
 			if (j == 0) {
@@ -284,7 +302,6 @@ void create_clustered_array(Column* col, Table* tbl, int num_elts) {
 				tbl->cluster_copy[i].index = NULL;
 				tbl->cluster_copy[i].clustered = false;
 				strcpy(tbl->cluster_copy[i].name, tbl->columns[i].name);
-				printf("nm : %s\n", tbl->cluster_copy[i].name);
 			}
 			
 			tbl->cluster_copy[i].data[j] = tbl->columns[i].data[cmp_array[j].id];
@@ -292,6 +309,11 @@ void create_clustered_array(Column* col, Table* tbl, int num_elts) {
 	}
 	col->index = malloc(sizeof(ColumnIndex));
 	
+	if (!col->index) {
+		printf("MALLOC FAILED!\n");
+	}
+
+	// create clustered btree index
 	if (col->type == BTREE) {
 		//printf("line 210 btree.c\n");
 		col->index = malloc(sizeof(ColumnIndex));
@@ -311,42 +333,42 @@ void create_clustered_array(Column* col, Table* tbl, int num_elts) {
 
 }
 
+
+// search btree to fulfill range query
 int btree_search(BtreeNode* root, int target) {
 	BtreeNode* tmp = root;
 	if (!tmp) {
 		return -1;
 	}
-//	printf("line 272 btreesearch\n");
+ 
 	int num_layers = 0;
+
+	// count number of levels in btree
 	while (tmp) {
-		//printf("iter1\n");
+ 
 		tmp = tmp->child_block;
-		//printf("iter2\n");
+ 
 		num_layers++;
 	}
- 	printf("line 278\n");
 	tmp = root;
-	// if (root->child_block[199].leaf) {
-	// 	printf("the leaf is right 270\n");
-	// }
+	
 	int return_val = -1;
-	printf("in the search 262\n");
+	
+	// start search
 	while (tmp) {
-		//printf("number of layers left: %i\n", tmp->num_elt);
+ 		// if you found the correct leaf with the desired value
 		if (num_layers==1) {
-		//	printf("line 243\n");
+ 
 			return_val = binary_search(tmp->data, target, tmp->num_elt);
 			if (return_val >= 0) {
 			 	return_val += tmp->start_id;
 			} 
-			//printf("return val index: %i\n", return_val);
-			printf("line 253 bin search: %i\n", tmp->data[binary_search(tmp->data, target, tmp->num_elt) - 1]);
-			//tmp = tmp->child_block;
+			
 			return return_val;
 		} else {
-		//	printf("line 249: %i\n", tmp->num_elt);
+
+			// traverse the parent nodes to find the correct leaf node
 			for (int i = 0; i < tmp->num_elt; i++) {
-			//	printf("data line 238 num %i: %i\n",i, tmp->num_elt);
 				if (tmp->data[i] >= target) {
 					
 					tmp = &(tmp->child_block[i]);
@@ -354,10 +376,10 @@ int btree_search(BtreeNode* root, int target) {
 					break;
 				} else if ((tmp->data[i] < target) && (i == tmp->num_elt-1)) {
 					if (tmp->child_block[i].last_node) {
-						printf("IN line 324\n");
+						
 						tmp = &(tmp->child_block[i]);
 					} else {
-						printf("IN line 327\n");
+						
 						tmp = &(tmp->child_block[i+1]);
 					}
 					num_layers--;
@@ -370,27 +392,27 @@ int btree_search(BtreeNode* root, int target) {
 	return return_val;
 }
 
-
+// function is initially called in server to create the index
 void handle_index(Column* col, Table* tbl, StoreType type, bool is_clustered) {
 	int loc_flg = 0;
 
 	if (!col->index) {
 		loc_flg = 1;
 	}
-	// printf("columun data: %i\n", tbl->table_length);
+	
 	col->type = type;
 	col->clustered = is_clustered;
-	printf("line 247 btree.c: %i\n", col->data[100002]);
+	
+	// check what type of index is being created
 	if (type == SORTED && is_clustered) {
 	  create_clustered_array(col,tbl, tbl->table_length);
 		
 	} else if (type == SORTED && !is_clustered) {
-		printf("table is the seg fault\n");
 		create_unclustered_array(col, tbl->table_length);
 
 	} 
 	else if (type == BTREE && is_clustered) {
-		printf("line 257 btree.c\n");
+
 		create_clustered_array(col, tbl, tbl->table_length);
 	} else if (type == BTREE && !is_clustered) {
 		create_unclustered_btree(col, tbl->table_length);
@@ -408,16 +430,6 @@ void handle_index(Column* col, Table* tbl, StoreType type, bool is_clustered) {
 
 // select function that stores the start and end indices
 void clustered_select(Result* res, int index_needed, Table* table, Column* column, char* interm, int lower, int upper) {
-	//int bitvect[table->table_length];
-	printf("yoyoyo\n");
-	// 
-	// if (!column) {
-	// 	printf("column is null");
-	// }
-
-	// if (!(column->data)) {
-	// 	printf("no data");
-	// }
 
 
 	int lookup = find_result(res, interm, index_needed);
@@ -426,43 +438,42 @@ void clustered_select(Result* res, int index_needed, Table* table, Column* colum
 	}
 
 	Column* col = NULL;
-	printf("line 294 btree.c\n");
+
+	// find column in copy of the data
 	for (int i = 0; i != (int)table->col_count; i++) {
-	//	printf("line 296 btree.c\n");
+ 
 	  if (strcmp(column->name, table->cluster_copy[i].name) == 0) {
 	    col = &table->cluster_copy[i];
-	//    printf("linw 299 btree.c\n");
+ 
 	    break;
 	  }
 	}
 
-	printf("line 300 btree.c");
+
 	
 
-//	int num_ones = 0;
 	int start_ind = 0;
 	int end_ind = 0;
+
+	// if index is an array we can simply use binary search 
+	// otherwise traverse the btree
 	if (column->type == SORTED) {
 		start_ind = binary_search(col->data, lower, table->table_length);
 		end_ind = binary_search(col->data, upper, table->table_length);
 	} else {
 		start_ind = btree_search(column->index->data_tree, lower);
-		printf("line 303 start ind: %i\n", start_ind);
+  
 		end_ind = btree_search(column->index->data_tree, upper);
-		printf("line 305 end ind: %i\n", end_ind);
+ 
 	}
-	printf("start_ind: %i\n",start_ind);
-	printf("end_ind: %i\n", end_ind);
+ 		// store the start and end indices (data is sorted)
 	    res[index_needed].payload[0] = start_ind;
 	    res[index_needed].payload[1] = end_ind;
-	    printf("table length: %zu\n", table->table_length);
-	//column = &table->columns[table->counter];
+	   
+ 
 	    res[index_needed].num_tuples=2;
 	    res[index_needed].select_type = RANGE;
-	    
 	
-	
-
 
 	res[index_needed].nm[0] = '\0';
         strcpy(res[index_needed].nm, interm);
@@ -470,11 +481,7 @@ void clustered_select(Result* res, int index_needed, Table* table, Column* colum
 	res[index_needed].data_type=INT;
 	res[index_needed].orig_lngth = table->table_length;
 	
-	
-//	res[index_needed].payload = payld;
-	printf("select fxn: %s\n", interm);
-	
-	//return res; 
+
 
 	// my issue is in relational insert 
 	// where I assign the data and hash the column
@@ -482,6 +489,9 @@ void clustered_select(Result* res, int index_needed, Table* table, Column* colum
 
 }
 
+
+// since I stored indices for an unclustered index
+// I can find the positions needed for range queries
 void unclust_select(Result* res, int index_needed, Table* table, Column* column, char* interm, int lower, int upper) {
 	int lookup = find_result(res, interm, index_needed);
 	if (lookup > -1) {
@@ -489,28 +499,10 @@ void unclust_select(Result* res, int index_needed, Table* table, Column* column,
 	}
 
 
-	//Column* col = NULL;
-	printf("line 306 btree.c \n");
-	// for (int i = 0; i != table->col_count; i++) {
-	//   if (strcmp(column->name, table->cluster_copy[i].name) == 0) {
-	//     col = &table->cluster_copy[i];
-	//   }
-	// }
 
-	//int num_ones = 0;
-
-	//int* dat_copy = malloc(sizeof(int)*table->table_length);
-	//printf("line 316 btree.c\n");
-	//memcpy(dat_copy, column->data, sizeof(int)*table->table_length);
-	//qsort((void*) dat_copy, table->table_length, sizeof(dat_copy[0]), comparator_uncl);
-	// for (int i = 0; i != 10; i++){
-	// 	printf("line 318 btree.c data: %i\n", dat_copy[i]);
-	// 	printf("index: %i\n", column->index->sorted[i].val);
-	// }
-	
-	//printf("line 318 btree.c\n");
+	// check if array index or btree index
 	if (column->type == SORTED) {
-	//	printf("wrong type?\n");
+
 		int start_ind = binary_search2(column->index->sorted, lower, table->table_length);
 		int end_ind = binary_search2(column->index->sorted, upper, table->table_length);
 
@@ -522,31 +514,28 @@ void unclust_select(Result* res, int index_needed, Table* table, Column* column,
 		}
 		res[index_needed].num_tuples = j;
 	} else {
-		// if (column->index->data_tree) {
-		// //	printf("line 456\n");
-		// }
-		printf("line 530 btree.c\n");
+		
+ 
 		int start_ind = btree_search(column->index->data_tree, lower);
-		printf("lower: %i\n", start_ind);
+ 
 		if (start_ind >= 0 || lower < column->data[0]){
 			if (start_ind == -1) {
 				start_ind = 0;
 			}
-			printf("line 427: %i\n", start_ind );
+ 
 			BtreeNode* leafs = column->index->data_tree;
 			while (leafs->child_block) {
 		//		printf("num_iter line 537\n");
 				leafs = leafs->child_block;
 			}
-			printf("line 432\n");
+ 
 			int j = start_ind/(PAGESIZE/4);
 			int keep_track_of_sz = start_ind;
 			int count = (start_ind % (PAGESIZE/4));
 			int payload_start = 0;
 			while (leafs[j].data[count%(PAGESIZE/4)] < upper && keep_track_of_sz < (int)table->table_length) {
 				res[index_needed].payload[payload_start]=leafs[j].orig_ids[count%(PAGESIZE/4)];
-				//printf("CHECK1 line 441: %i\n", column->data[leafs[j].orig_ids[count%(PAGESIZE/4)]]);
-				//printf("CHECK2 line 442: %i\n", leafs[j].data[count%(PAGESIZE/4)]);
+				 
 				count++;
 				payload_start++;
 				keep_track_of_sz++;
@@ -558,7 +547,7 @@ void unclust_select(Result* res, int index_needed, Table* table, Column* column,
 		}
 	}
 	
-
+	// store id's in result array
 	res[index_needed].orig_lngth = table->table_length;
 	res[index_needed].data_type = INT;
 	res[index_needed].select_type = IDX;
@@ -566,13 +555,13 @@ void unclust_select(Result* res, int index_needed, Table* table, Column* column,
 
 }
 
+
+// fetch to be called after cluster_select
 void cluster_fetch(Result* res, int ind_needed, Table* table, Column* column, char* interm, Result* intermediate) {
 	if (!column) {
-		printf("jsld\n");
+		printf("ERROR\n");
 	}
-	printf("got to the fetch function\n");
-	//column = &table->columns[table->counter];
-
+	
 
 	int lookup = find_result(res, interm, ind_needed);
 	if (lookup > -1) {
@@ -582,19 +571,17 @@ void cluster_fetch(Result* res, int ind_needed, Table* table, Column* column, ch
 	Column* col = NULL;
 	
 	for (int i = 0; i != (int)table->col_count; i++) {
-		printf("name 597: %s\n", column->name);
-		printf("name 598: %s\n", table->cluster_copy[i].name);
+
 	  if (strcmp(column->name, table->cluster_copy[i].name) == 0) {
 	    col = &table->cluster_copy[i];
 	  }
 	}
-	printf("way1\n");
-	//int final_payload[intermediate->num_tuples];
+
 	int num_stored = 0;
 
 	if (intermediate->select_type == RANGE) {
 	  num_stored = intermediate->payload[1] - intermediate->payload[0];
-	  printf("num_Stored line 304 btree.c: %i\n", col->data[0]);
+
 	  memcpy(res[ind_needed].payload, col->data + intermediate->payload[0], sizeof(int)*num_stored);
 
 	}
@@ -621,11 +608,11 @@ void id_fetch(Result* res, int ind_needed, Column* column, Table* table, char* i
 		}
 	} else {
 		Column* col = NULL;
-		printf("line 294 btree.c\n");
+	 	// get appropriate ID's
 		for (int i = 0; i != (int)table->col_count; i++) {
-			printf("line 296 btree.c: %s\n", table->name);
+ 
 		  if (strcmp(column->name, table->cluster_copy[i].name) == 0) {
-		    printf("in the if statemn\n");
+	 
 		    col = &table->cluster_copy[i];
 		    break;
 		  }
@@ -670,7 +657,7 @@ void _join(char* store1, char* store2, Result* fetch1, Result* fetch2, Result* s
 	memset((void*)buf2, 0, 4*fetch2->num_tuples);
 
 	for (int i = 0; i != sel1->orig_lngth; i++) {
-		//printf("c: %s\n", sel1->nm);
+	 
 		if (sel1->payload[i] == 1) {
 			buf1[k] = i;
 			k++;
@@ -701,7 +688,10 @@ void _join(char* store1, char* store2, Result* fetch1, Result* fetch2, Result* s
 			}
 		} else {
 		hashtable* ht =  NULL;
+		
+		// allocate hashtable
 		int fail = allocate(&ht, fetch1->num_tuples);
+
 		if (fail==-1) {
 			printf("FAILURE TO ALLOCATE HASHTABLE\n");
 		}
@@ -761,10 +751,5 @@ void _join(char* store1, char* store2, Result* fetch1, Result* fetch2, Result* s
 
 
 
-/// INDEX UPDATE ///
-
-// void insert_index(Table* table, Column* col, int* vals) {
-
-// }
 
 
