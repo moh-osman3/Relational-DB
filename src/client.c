@@ -655,7 +655,7 @@ int main(void)
 
                                 
                                 
-                                   
+                                // determine size of message to send
                                 if (total_to_send > 1024) {
 
                                     send_message2.length = 1024;   
@@ -684,29 +684,21 @@ int main(void)
                         }
                     }
                     glob_mes_to_receive--;
-                   // current_db->wt = 1;
+ 
                 }
                  
-         //   }
+ 
             }
         }
-          //   else {
-          //       if (len < 0) {
-          //           log_err("Failed to receive message.");
-          //       }
-          //       else {
-		        //     log_info("-- Server closed connection\n");
-		        // }
-          //       exit(1);
-          //   }
+   
         
     }
-  //  printf("line 775\n");
+ 
     message send_message_final;
     strcpy(send_message_final.payload, "c_shutdown");
     send_message_final.status = CLIENT_S;
     send_message_final.length = 10;
-    //log_info("Connection closed at socket %d!\n", client_socket);
+ 
     if (send(client_socket, &(send_message_final), sizeof(message), 0) == -1) {
         log_err("Failed to send message.");
         exit(1);
